@@ -1,11 +1,8 @@
 # Armourers-Workshop-Plugin
-Armourers-Workshop-Plugin
-
-
 
 [![](https://bstats.org/signatures/bukkit/Armourers%20Workshop%20Plugin.svg)](https://bstats.org/plugin/bukkit/Armourers%20Workshop%20Plugin/22668)
 
-# How To Use:
+### How To Use:
 
 
 For Plugin Server Owner:
