@@ -6,9 +6,12 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 
 /**
@@ -155,15 +158,34 @@ public class SkinFileUtils {
 //        IOUtils.closeQuietly(outputStream);
 //    }
 
+    /**
+     * Copies bytes from an InputStream to an OutputStream.
+     * This method buffers the input internally, so there is no need to use a BufferedInputStream.
+     * Large streams (over 2GB) will return a bytes copied value of -1 after the copy has completed
+     * since the correct number of bytes cannot be returned as an int.
+     * For large streams use the copyLarge(InputStream, OutputStream) method.
+     */
+    public static void transferTo(final InputStream inputStream, final OutputStream outputStream) throws IOException {
+        IOUtils.copy(inputStream, outputStream);
+    }
+
     public static void writeNBT(CompoundTag compoundTag, File file) throws IOException {
-        NbtIo.write(compoundTag, Files.newOutputStream(file.toPath()));
+        writeNBT(compoundTag, Files.newOutputStream(file.toPath()));
+    }
+
+    public static void writeNBT(CompoundTag compoundTag, OutputStream outputStream) throws IOException {
+        NbtIo.write(compoundTag, outputStream);
     }
 
     public static CompoundTag readNBT(File file) throws IOException {
         if (file.exists()) {
-            return NbtIo.read(Files.newInputStream(file.toPath()));
+            return readNBT(Files.newInputStream(file.toPath()));
         }
         return null;
+    }
+
+    public static CompoundTag readNBT(InputStream inputStream) throws IOException {
+        return NbtIo.read(inputStream);
     }
 
     public static CompoundTag readNBT(String contents) {

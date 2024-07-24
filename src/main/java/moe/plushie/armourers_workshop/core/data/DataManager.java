@@ -1,100 +1,170 @@
 package moe.plushie.armourers_workshop.core.data;
 
-import moe.plushie.armourers_workshop.init.platform.EnvironmentManager;
-import moe.plushie.armourers_workshop.init.ModContext;
-import moe.plushie.armourers_workshop.init.ModLog;
-import moe.plushie.armourers_workshop.utils.Constants;
-import moe.plushie.armourers_workshop.utils.SkinFileUtils;
-import org.bukkit.Bukkit;
-import org.bukkit.World;
+import moe.plushie.armourers_workshop.core.data.source.SkinFileDataSource;
+import moe.plushie.armourers_workshop.core.data.source.SkinWardrobeDataSource;
+import moe.plushie.armourers_workshop.core.skin.Skin;
+import moe.plushie.armourers_workshop.init.ModConfig;
+import moe.plushie.armourers_workshop.utils.SkinFileStreamUtils;
+import net.cocoonmc.core.nbt.CompoundTag;
+import net.cocoonmc.core.world.entity.Entity;
+import net.cocoonmc.core.world.entity.Player;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.io.InputStream;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.util.ArrayList;
+import java.util.HashMap;
 
 public class DataManager {
 
-    private static DataManager INSTANCE;
+    private static final DataManager INSTANCE = new DataManager();
 
-    private final File rootPath;
-    private final File dbPath;
-    private final File wardrobePath;
+    private SkinFileDataSource fileDataSource;
+    private SkinWardrobeDataSource wardrobeDataSource;
 
-    private DataManager(File rootPath) {
-        this.rootPath = rootPath;
-        this.dbPath = new File(rootPath, "skin-database");
-        this.wardrobePath = new File(dbPath, "wardrobe");
-        // ..
-        ModContext.init(new File(rootPath, "data/ArmourersWorkshop.dat"));
-    }
+    private final ArrayList<Runnable> tickTacks = new ArrayList<>();
+    private final HashMap<String, Connection> reusableConnections = new HashMap<>();
 
     public static DataManager getInstance() {
         return INSTANCE;
     }
 
-    public static void start() {
-        if (INSTANCE == null) {
-            World world = Bukkit.getServer().getWorlds().get(0);
-            INSTANCE = new DataManager(new File(world.getName()));
+    public void connect(File rootPath) {
+        try {
+            reusableConnections.clear();
+            // connect to file data source.
+            fileDataSource = createFileDataSource(new SkinFileDataSource.Local(rootPath));
+            fileDataSource.connect();
+            // connect to wardrobe data source.
+            wardrobeDataSource = createWardrobeDataSource(new SkinWardrobeDataSource.Local());
+            wardrobeDataSource.connect();
+        } catch (Exception exception) {
+            throw new RuntimeException(exception);
         }
     }
 
-    public static void stop() {
-        if (INSTANCE != null) {
-            INSTANCE = null;
+    public void disconnect() {
+        try {
+            tick(); // force tick
+            reusableConnections.clear();
+            // disconnect from file data source.
+            fileDataSource.disconnect();
+            fileDataSource = null;
+            // disconnect from wardrobe data source.
+            wardrobeDataSource.disconnect();
+            wardrobeDataSource = null;
+        } catch (Exception exception) {
+            throw new RuntimeException(exception);
         }
     }
 
-    public InputStream loadSkinData(String identifier) throws IOException {
-        ModLog.debug("'{}' => get skin input stream from data manager", identifier);
-        if (DataDomain.isDatabase(identifier)) {
-            String path = DataDomain.getPath(identifier);
-            return LocalDataService.getInstance().getFile(path);
-        } else {
-            String path = SkinFileUtils.normalize(DataDomain.getPath(identifier));
-            return loadStreamFromPath(path);
+    public void tick() {
+        if (!tickTacks.isEmpty()) {
+            tickTacks.forEach(Runnable::run);
+            tickTacks.clear();
         }
     }
 
-//    public void loadSkinData(String identifier, IResultHandler<InputStream> handler) {
-//        executor.submit(() -> {
-//            try {
-//                handler.accept(loadSkinData(identifier));
-//            } catch (Exception exception) {
-//                handler.reject(exception);
-//            }
-//        });
-//    }
-
-    private InputStream loadStreamFromPath(String identifier) throws IOException {
-        File file = new File(EnvironmentManager.getSkinLibraryDirectory(), identifier);
-        if (file.exists()) {
-            return new FileInputStream(file);
-        }
-        file = new File(EnvironmentManager.getSkinLibraryDirectory(), identifier + Constants.EXT);
-        if (file.exists()) {
-            return new FileInputStream(file);
-        }
-        throw new FileNotFoundException(identifier);
+    public void submit(Runnable task) {
+        tickTacks.add(task);
     }
 
-//    private File getSkinCacheFile(String identifier) {
-//        File rootPath = getSkinCacheDirectory();
-//        if (rootPath != null) {
-//            String namespace = DataDomain.getNamespace(identifier);
-//            String path = DataDomain.getPath(identifier);
-//            return new File(rootPath, namespace + "/" + ModContext.md5(path) + ".dat");
-//        }
-//        return null;
-//    }
-//
-//    private File getSkinCacheDirectory() {
-//        UUID t0 = ModContext.t0();
-//        if (t0 != null) {
-//            return new File(AWCore.getSkinCacheDirectory(), t0.toString());
-//        }
-//        return null;
-//    }
+    public String saveSkin(Skin skin) throws Exception {
+        ByteArrayOutputStream stream = new ByteArrayOutputStream(5 * 1024);
+        SkinFileStreamUtils.saveSkinToStream(stream, skin);
+        byte[] bytes = stream.toByteArray();
+        return saveSkinData(new ByteArrayInputStream(bytes));
+    }
+
+    public Skin loadSkin(String id) throws Exception {
+        InputStream inputStream = loadSkinData(id);
+        return SkinFileStreamUtils.loadSkinFromStream2(inputStream);
+    }
+
+    public String saveSkinData(InputStream inputStream) throws Exception {
+        if (fileDataSource != null) {
+            return fileDataSource.save(inputStream);
+        }
+        throw new Exception("Missing data source connect!");
+    }
+
+    public InputStream loadSkinData(String id) throws Exception {
+        if (fileDataSource != null) {
+            return fileDataSource.load(id);
+        }
+        throw new Exception("Missing data source connect!");
+    }
+
+    public CompoundTag saveSkinWardrobeData(Entity entity, CompoundTag tag) {
+        // only support save wardrobe data of the player.
+        if (wardrobeDataSource != null && entity instanceof Player) {
+            try {
+                // additional save wardrobe data to external database.
+                wardrobeDataSource.save(entity.getStringUUID(), tag);
+            } catch (Exception exception) {
+                // unable to save, ignore.
+                exception.printStackTrace();
+            }
+        }
+        return tag; // we always register data with vanilla
+    }
+
+    public CompoundTag loadSkinWardrobeData(Entity entity, CompoundTag tag) {
+        // only support load wardrobe data of the player.
+        if (wardrobeDataSource != null && entity instanceof Player) {
+            try {
+                // prioritize use wardrobe data from external database.
+                CompoundTag newTag = wardrobeDataSource.load(entity.getStringUUID());
+                if (newTag != null) {
+                    return newTag;
+                }
+            } catch (Exception e) {
+                // unable to load, rollback to vanilla data.
+                e.printStackTrace();
+            }
+        }
+        return tag;
+    }
+
+    public boolean isConnected() {
+        return fileDataSource != null;
+    }
+
+
+    private SkinFileDataSource createFileDataSource(SkinFileDataSource fallback) throws Exception {
+        String uri = ModConfig.Common.skinDatabaseURL;
+        if (uri.startsWith("jdbc:")) {
+            String name = uri.replaceAll("jdbc:([^:]+):(.+)", "$1");
+            SkinFileDataSource source = new SkinFileDataSource.SQL(name, createConnection(uri));
+            return new SkinFileDataSource.Fallback(source, fallback);
+        }
+        return fallback;
+    }
+
+    private SkinWardrobeDataSource createWardrobeDataSource(SkinWardrobeDataSource fallback) throws Exception {
+        String uri = ModConfig.Common.wardrobeDatabaseURL;
+        if (uri.startsWith("jdbc:")) {
+            String name = uri.replaceAll("jdbc:([^:]+):(.+)", "$1");
+            return new SkinWardrobeDataSource.SQL(name, createConnection(uri));
+        }
+        return fallback;
+    }
+
+    // https://web.archive.org/web/20240216222419/https://dev.mysql.com/doc/connector-j/en/connector-j-usagenotes-connect-drivermanager.html#connector-j-examples-connection-drivermanager
+    // https://web.archive.org/web/20240704142945/https://github.com/xerial/sqlite-jdbc
+    // https://web.archive.org/web/20240721072726/https://github.com/DataGrip/redis-jdbc-driver
+    private Connection createConnection(String uri) throws Exception {
+        Connection connection = reusableConnections.get(uri);
+        if (connection != null) {
+            return connection;
+        }
+        connection = DriverManager.getConnection(uri);
+        reusableConnections.put(uri, connection);
+        return connection;
+    }
 }
+
+

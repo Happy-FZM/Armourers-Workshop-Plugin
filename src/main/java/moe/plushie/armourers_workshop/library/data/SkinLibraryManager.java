@@ -4,7 +4,6 @@ package moe.plushie.armourers_workshop.library.data;
 import moe.plushie.armourers_workshop.api.library.ISkinLibrary;
 import moe.plushie.armourers_workshop.api.library.ISkinLibraryListener;
 import moe.plushie.armourers_workshop.core.data.DataDomain;
-import moe.plushie.armourers_workshop.core.data.LocalDataService;
 import moe.plushie.armourers_workshop.core.network.NetworkManager;
 import moe.plushie.armourers_workshop.init.ModConfig;
 import moe.plushie.armourers_workshop.init.ModLog;
@@ -179,10 +178,6 @@ public abstract class SkinLibraryManager implements ISkinLibraryListener {
 //                return player != null && player.hasPermissions(5);
 //            }
             return false;
-        }
-
-        public LocalDataService getDatabaseLibrary() {
-            return LocalDataService.getInstance();
         }
 
         public int getVersion() {

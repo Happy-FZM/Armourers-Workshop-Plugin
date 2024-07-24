@@ -48,6 +48,11 @@ public class SimpleConfig implements IConfigSpec, IConfigBuilder {
     }
 
     @Override
+    public IConfigValue<String> define(String path, String defaultValue, String... description) {
+        return put(new Entry<>(convertTo(path), defaultValue, Lists.newArrayList(description)));
+    }
+
+    @Override
     public IConfigValue<Integer> defineInRange(String path, int defaultValue, int minValue, int maxValue, String... description) {
         return put(new RangeEntry<>(convertTo(path), defaultValue, minValue, maxValue, Lists.newArrayList(description)));
     }

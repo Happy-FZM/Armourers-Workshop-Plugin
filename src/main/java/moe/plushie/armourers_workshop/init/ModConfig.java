@@ -42,6 +42,10 @@ public class ModConfig {
         public static boolean allowUploadingSkins = true;
         public static boolean allowLibraryRemoteManage = false;
 
+        // Database
+        public static String skinDatabaseURL = "";
+        public static String wardrobeDatabaseURL = "";
+
         // Recipes
         public static boolean disableRecipes = false;
         public static boolean disableDollRecipe = false;

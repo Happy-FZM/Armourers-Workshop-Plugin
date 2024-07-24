@@ -1,6 +1,7 @@
 package moe.plushie.armourers_workshop.init;
 
 import moe.plushie.armourers_workshop.ArmourersWorkshopPlugin;
+import moe.plushie.armourers_workshop.init.platform.EnvironmentManager;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -16,6 +17,11 @@ public class ModLog {
     }
 
     public static void debug(String message, Object... params) {
+        // in the development mode, highlight from our debug log.
+        if (EnvironmentManager.isDevelopment()) {
+            LOGGER.info(_format(message, params));
+            return;
+        }
         LOGGER.config(_format(message, params));
     }
 

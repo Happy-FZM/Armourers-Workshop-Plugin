@@ -2,6 +2,7 @@ package moe.plushie.armourers_workshop.core.skin;
 
 import moe.plushie.armourers_workshop.api.ITagRepresentable;
 import moe.plushie.armourers_workshop.api.skin.ISkinType;
+import moe.plushie.armourers_workshop.core.data.DataManager;
 import moe.plushie.armourers_workshop.core.network.NetworkManager;
 import moe.plushie.armourers_workshop.core.network.UpdateWardrobePacket;
 import moe.plushie.armourers_workshop.init.ModConfig;
@@ -59,7 +60,7 @@ public class SkinWardrobe implements ITagRepresentable<CompoundTag> {
             SkinWardrobe wardrobe = new SkinWardrobe(entity, profile);
             CompoundTag tag = entity.getPersistentData(SkinWardrobeStorage.SKIN_WARDROBE_KEY, PersistentDataHelper.COMPOUND_TAG);
             if (tag != null && tag.size() != 0) {
-                wardrobe.deserializeNBT(tag);
+                wardrobe.deserializeNBT(DataManager.getInstance().loadSkinWardrobeData(entity, tag));
             }
             return wardrobe;
         });
@@ -87,7 +88,9 @@ public class SkinWardrobe implements ITagRepresentable<CompoundTag> {
     public void save() {
         Entity entity = getEntity();
         if (entity != null) {
-            entity.setPersistentData(SkinWardrobeStorage.SKIN_WARDROBE_KEY, PersistentDataHelper.COMPOUND_TAG, serializeNBT());
+            CompoundTag tag = serializeNBT();
+            DataManager.getInstance().saveSkinWardrobeData(entity, tag);
+            entity.setPersistentData(SkinWardrobeStorage.SKIN_WARDROBE_KEY, PersistentDataHelper.COMPOUND_TAG, tag);
         }
     }
 

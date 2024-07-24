@@ -26,6 +26,16 @@ public class ObjectUtils {
         return null;
     }
 
+    public static void safeClose(AutoCloseable closeable) {
+        try {
+            if (closeable != null) {
+                closeable.close();
+            }
+        } catch (Exception exception) {
+            exception.printStackTrace();
+        }
+    }
+
 //    public static String replaceString(String string, NSRange range, String replacementString) {
 //        return (new StringBuilder(string)).replace(range.startIndex(), range.endIndex(), replacementString).toString();
 //    }

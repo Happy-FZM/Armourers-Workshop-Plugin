@@ -28,4 +28,8 @@ public class EnvironmentManager {
         World world = Bukkit.getServer().getWorlds().get(0);
         return new File(world.getWorldFolder(), "skin-database");
     }
+
+    public static boolean isDevelopment() {
+        return !System.getProperties().containsKey("production");
+    }
 }

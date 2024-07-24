@@ -4,7 +4,6 @@ import moe.plushie.armourers_workshop.api.IResultHandler;
 import moe.plushie.armourers_workshop.api.skin.ISkinLibraryLoader;
 import moe.plushie.armourers_workshop.core.data.DataDomain;
 import moe.plushie.armourers_workshop.core.data.DataManager;
-import moe.plushie.armourers_workshop.core.data.LocalDataService;
 import moe.plushie.armourers_workshop.init.ModConfig;
 import moe.plushie.armourers_workshop.init.ModContext;
 import moe.plushie.armourers_workshop.init.ModLog;
@@ -112,15 +111,19 @@ public class SkinLoader {
     }
 
     public String saveSkin(String identifier, Skin skin) {
-        if (DataDomain.isDatabase(identifier)) {
-            return identifier;
-        }
-        String newIdentifier = LocalDataService.getInstance().addFile(skin);
-        if (newIdentifier != null) {
+        try {
+            // when the skin is already in the database, we not need to modify it.
+            if (DataDomain.isDatabase(identifier)) {
+                return identifier;
+            }
+            String newIdentifier = DataManager.getInstance().saveSkin(skin);
             identifier = DataDomain.DATABASE.normalize(newIdentifier);
             addSkin(identifier, skin);
+            return identifier;
+        } catch (Exception exception) {
+            exception.printStackTrace();
+            return identifier;
         }
-        return identifier;
     }
 
 
@@ -420,7 +423,8 @@ public class SkinLoader {
 
         @Override
         public InputStream from(Request request) throws Exception {
-            return DataManager.getInstance().loadSkinData(request.identifier);
+            String id = DataDomain.getPath(request.identifier);
+            return DataManager.getInstance().loadSkinData(id);
         }
     }
 

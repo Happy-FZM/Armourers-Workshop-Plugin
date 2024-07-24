@@ -1,7 +1,6 @@
 package moe.plushie.armourers_workshop;
 
 import moe.plushie.armourers_workshop.core.data.DataManager;
-import moe.plushie.armourers_workshop.core.data.LocalDataService;
 import moe.plushie.armourers_workshop.core.network.NetworkManager;
 import moe.plushie.armourers_workshop.core.recipe.SkinningRecipes;
 import moe.plushie.armourers_workshop.core.skin.SkinLoader;
@@ -19,6 +18,7 @@ import moe.plushie.armourers_workshop.init.ModPackets;
 import moe.plushie.armourers_workshop.init.ModPermissions;
 import moe.plushie.armourers_workshop.init.handler.EntityEventHandler;
 import moe.plushie.armourers_workshop.init.handler.PacketEventHandler;
+import moe.plushie.armourers_workshop.init.platform.EnvironmentManager;
 import moe.plushie.armourers_workshop.library.data.SkinLibraryManager;
 import moe.plushie.armourers_workshop.utils.Metrics;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -47,8 +47,7 @@ public final class ArmourersWorkshopPlugin extends JavaPlugin {
 
         NetworkManager.init();
         SkinningRecipes.init();
-        LocalDataService.start(getServer());
-        DataManager.start();
+        DataManager.getInstance().connect(EnvironmentManager.getSkinDatabaseDirectory());
         SkinLoader.getInstance().setup();
         SkinLibraryManager.getServer().start();
 
@@ -62,7 +61,6 @@ public final class ArmourersWorkshopPlugin extends JavaPlugin {
     public void onDisable() {
         // Plugin shutdown logic
         SkinLibraryManager.getServer().stop();
-        LocalDataService.stop();
-        DataManager.stop();
+        DataManager.getInstance().disconnect();
     }
 }
