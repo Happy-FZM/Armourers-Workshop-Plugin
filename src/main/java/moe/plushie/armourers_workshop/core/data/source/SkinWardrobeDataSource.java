@@ -3,7 +3,6 @@ package moe.plushie.armourers_workshop.core.data.source;
 import moe.plushie.armourers_workshop.api.data.IDataSource;
 import moe.plushie.armourers_workshop.init.ModLog;
 import moe.plushie.armourers_workshop.utils.ObjectUtils;
-import moe.plushie.armourers_workshop.utils.Scheduler;
 import moe.plushie.armourers_workshop.utils.SkinFileUtils;
 import net.cocoonmc.core.nbt.CompoundTag;
 
@@ -12,7 +11,8 @@ import java.io.ByteArrayOutputStream;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.Statement;
+import java.util.HashMap;
+import java.util.Objects;
 
 public abstract class SkinWardrobeDataSource implements IDataSource {
 
@@ -40,6 +40,8 @@ public abstract class SkinWardrobeDataSource implements IDataSource {
         private final String name;
         private final Connection connection;
 
+        private final HashMap<String, CompoundTag> lastChanges = new HashMap<>();
+
         private PreparedStatement insertStatement;
         private PreparedStatement updateStatement;
         private PreparedStatement queryStatement;
@@ -53,10 +55,10 @@ public abstract class SkinWardrobeDataSource implements IDataSource {
         public void connect() throws Exception {
             ModLog.debug("Connect to wardrobe db: '{}'", name);
             // try to create skin table if needed.
-            try (Statement stmt = connection.createStatement()) {
-                // 100 = 48 + 4 + 48
-                stmt.execute("CREATE TABLE IF NOT EXISTS `SkinWardrobe` (`id` VARCHAR(100) NOT NULL PRIMARY KEY, `tag` LONGBLOB NOT NULL)");
-            }
+            SQLTableBuilder builder = new SQLTableBuilder("SkinWardrobe");
+            builder.add("id", "VARCHAR(100) NOT NULL PRIMARY KEY"); //  48 + 4 + 48
+            builder.add("tag", "LONGBLOB NOT NULL");
+            builder.execute(connection);
             // create precompiled statement when create after;
             queryStatement = connection.prepareStatement("SELECT `tag` FROM `SkinWardrobe` where `id` = (?)");
             updateStatement = connection.prepareStatement("UPDATE `SkinWardrobe` SET `tag` = (?) where `id` = (?)");
@@ -72,18 +74,25 @@ public abstract class SkinWardrobeDataSource implements IDataSource {
             ObjectUtils.safeClose(queryStatement);
 
             connection.close();
+            lastChanges.clear();
+        }
+
+        @Override
+        public CompoundTag load(String id) throws Exception {
+            CompoundTag tag = super.load(id);
+            if (tag != null) {
+                lastChanges.put(id, tag);
+            }
+            return tag;
         }
 
         @Override
         public void save(String id, CompoundTag tag) throws Exception {
-            // at the end of server tick we will batch save.
-            Scheduler.run(() -> {
-                try {
-                    super.save(id, tag);
-                } catch (Exception exception) {
-                    exception.printStackTrace();
-                }
-            });
+            // when no any changes, we will skip insert for reduce database IO.
+            if (!Objects.equals(tag, lastChanges.get(id))) {
+                super.save(id, tag);
+                lastChanges.put(id, tag);
+            }
         }
 
         @Override
@@ -107,34 +116,6 @@ public abstract class SkinWardrobeDataSource implements IDataSource {
                     return result.getBytes(1);
                 }
             }
-            return null;
-        }
-    }
-
-    public static class Local extends SkinWardrobeDataSource {
-
-        @Override
-        public void connect() throws Exception {
-            // nop
-        }
-
-        @Override
-        public void disconnect() throws Exception {
-            // nop
-        }
-
-        @Override
-        public void save(String id, CompoundTag tag) throws Exception {
-            // nop
-        }
-
-        @Override
-        protected void insert(String id, byte[] tag) throws Exception {
-            // nop
-        }
-
-        @Override
-        protected byte[] query(String id) throws Exception {
             return null;
         }
     }

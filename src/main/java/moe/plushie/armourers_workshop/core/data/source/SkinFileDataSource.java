@@ -21,7 +21,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
@@ -44,12 +44,13 @@ public abstract class SkinFileDataSource implements IDataSource {
         if (identifier != null) {
             return identifier;
         }
+        Skin skin = SkinFileStreamUtils.loadSkinFromStream2(new ByteArrayInputStream(bytes));
         identifier = getFreeId();
-        update(identifier, hash, bytes);
+        update(identifier, skin, hash, bytes);
         return identifier;
     }
 
-    protected abstract void update(String id, int hash, byte[] bytes) throws Exception;
+    protected abstract void update(String id, Skin skin, int hash, byte[] bytes) throws Exception;
 
     protected abstract byte[] query(String id) throws Exception;
 
@@ -85,14 +86,21 @@ public abstract class SkinFileDataSource implements IDataSource {
         public void connect() throws SQLException {
             ModLog.debug("Connect to file db: '{}'", name);
             // try to create skin table if needed.
-            try (Statement stmt = connection.createStatement()) {
-                stmt.execute("CREATE TABLE IF NOT EXISTS `Skin` (`id` VARCHAR(48) NOT NULL PRIMARY KEY, `hash` INT NOT NULL, `file` LONGBLOB NOT NULL)");
-            }
+            SQLTableBuilder builder = new SQLTableBuilder("Skin");
+            builder.add("id", "VARCHAR(48) NOT NULL PRIMARY KEY");
+            builder.add("type", "VARCHAR(48)");
+            builder.add("created_at", "TIMESTAMP");
+            builder.add("name", "VARCHAR(512)");
+            builder.add("flavour", "VARCHAR(1024)");
+            builder.add("author", "VARCHAR(48)");
+            builder.add("hash", "INT NOT NULL");
+            builder.add("file", "LONGBLOB NOT NULL");
+            builder.execute(connection);
             // create precompiled statement when create after;
-            existsStatement = connection.prepareStatement("SELECT `id` FROM `Skin` where `id` = (?)");
-            searchStatement = connection.prepareStatement("SELECT `id`, `file` FROM `Skin` where `hash` = (?)");
             queryStatement = connection.prepareStatement("SELECT `file` FROM `Skin` where `id` = (?)");
-            insertStatement = connection.prepareStatement("INSERT INTO `Skin` (`id`, `hash`, `file`) VALUES (?, ?, ?)");
+            searchStatement = connection.prepareStatement("SELECT `id`, `file` FROM `Skin` where `hash` = (?)");
+            existsStatement = connection.prepareStatement("SELECT `id` FROM `Skin` where `id` = (?)");
+            insertStatement = connection.prepareStatement("INSERT INTO `Skin` (`id`, `type`, `author`, `name`, `flavour`, `created_at`, `hash`, `file`) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         }
 
         @Override
@@ -108,11 +116,16 @@ public abstract class SkinFileDataSource implements IDataSource {
         }
 
         @Override
-        protected void update(String id, int hash, byte[] bytes) throws SQLException {
+        protected void update(String id, Skin skin, int hash, byte[] bytes) throws SQLException {
             ModLog.debug("Save file '{}' into '{}'", id, name);
             insertStatement.setString(1, id);
-            insertStatement.setInt(2, hash);
-            insertStatement.setBytes(3, bytes);
+            insertStatement.setString(2, skin.getType().getRegistryName().toString());
+            insertStatement.setString(3, skin.getAuthorUUID());
+            insertStatement.setString(4, skin.getCustomName());
+            insertStatement.setString(5, skin.getFlavourText());
+            insertStatement.setTimestamp(6, new Timestamp(System.currentTimeMillis()));
+            insertStatement.setInt(7, hash);
+            insertStatement.setBytes(8, bytes);
             insertStatement.executeUpdate();
         }
 
@@ -180,7 +193,7 @@ public abstract class SkinFileDataSource implements IDataSource {
         }
 
         @Override
-        protected void update(String id, int hash, byte[] bytes) {
+        protected void update(String id, Skin skin, int hash, byte[] bytes) {
             ModLog.debug("Save file '{}' into '{}'", id, name);
             Node newNode = new Node(id, hash, bytes);
             newNode.save(new ByteArrayInputStream(bytes));
@@ -402,8 +415,8 @@ public abstract class SkinFileDataSource implements IDataSource {
         }
 
         @Override
-        protected void update(String id, int hash, byte[] bytes) throws Exception {
-            source.update(id, hash, bytes);
+        protected void update(String id, Skin skin, int hash, byte[] bytes) throws Exception {
+            source.update(id, skin, hash, bytes);
         }
 
         @Override

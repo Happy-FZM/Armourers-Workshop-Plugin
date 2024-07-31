@@ -107,6 +107,8 @@ public class SimpleConfig implements IConfigSpec, IConfigBuilder {
         values.forEach((key, value) -> {
             if (value.getter != null) {
                 fields.put(key, value.getter.get());
+            } else {
+                fields.put(key, null);
             }
         });
         return fields;

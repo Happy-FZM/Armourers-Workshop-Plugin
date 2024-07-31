@@ -45,6 +45,22 @@ public class Skin {
         return type;
     }
 
+    public String getCustomName() {
+        return properties.get(SkinProperty.ALL_CUSTOM_NAME);
+    }
+
+    public String getAuthorName() {
+        return properties.get(SkinProperty.ALL_AUTHOR_NAME);
+    }
+
+    public String getAuthorUUID() {
+        return properties.get(SkinProperty.ALL_AUTHOR_UUID);
+    }
+
+    public String getFlavourText() {
+        return properties.get(SkinProperty.ALL_FLAVOUR_TEXT);
+    }
+
     public SkinProperties getProperties() {
         return properties;
     }
