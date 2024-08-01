@@ -1,18 +1,19 @@
 package moe.plushie.armourers_workshop.utils;
 
+import com.google.common.collect.Lists;
 import net.cocoonmc.core.nbt.CompoundTag;
 import net.cocoonmc.core.nbt.NbtIo;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * because `commons.io` versions on some servers are too low,
@@ -49,12 +50,16 @@ public class SkinFileUtils {
         return FilenameUtils.concat(basePath, fullFilenameToAdd);
     }
 
-    public static File[] listFiles(final File directory) {
+    public static List<File> listFiles(final File directory) {
         try {
-            return directory.listFiles();
+            File[] files = directory.listFiles();
+            if (files != null) {
+                return Lists.newArrayList(files);
+            }
         } catch (Exception ignored) {
-            return null;
+            // ignore
         }
+        return Collections.emptyList();
     }
 
     /**
