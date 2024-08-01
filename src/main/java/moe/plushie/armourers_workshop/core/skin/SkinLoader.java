@@ -8,6 +8,7 @@ import moe.plushie.armourers_workshop.init.ModConfig;
 import moe.plushie.armourers_workshop.init.ModContext;
 import moe.plushie.armourers_workshop.init.ModLog;
 import moe.plushie.armourers_workshop.init.platform.EnvironmentManager;
+import moe.plushie.armourers_workshop.utils.Constants;
 import moe.plushie.armourers_workshop.utils.SkinFileUtils;
 import moe.plushie.armourers_workshop.utils.SkinIOUtils;
 import moe.plushie.armourers_workshop.utils.StreamUtils;
@@ -25,6 +26,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.lang.ref.SoftReference;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -423,8 +425,22 @@ public class SkinLoader {
 
         @Override
         public InputStream from(Request request) throws Exception {
-            String id = DataDomain.getPath(request.identifier);
-            return DataManager.getInstance().loadSkinData(id);
+            // db:<skin-id>
+            if (DataDomain.isDatabase(request.identifier)) {
+                String id = DataDomain.getPath(request.identifier);
+                return DataManager.getInstance().loadSkinData(id);
+            }
+            // fs:<file-path> or ws:<file-path>
+            String path = SkinFileUtils.normalize(DataDomain.getPath(request.identifier));
+            File file = new File(EnvironmentManager.getSkinLibraryDirectory(), path);
+            if (file.exists()) {
+                return Files.newInputStream(file.toPath());
+            }
+            file = new File(file.getParent(), file.getName() + Constants.EXT);
+            if (file.exists()) {
+                return Files.newInputStream(file.toPath());
+            }
+            return null;
         }
     }
 
